@@ -84,8 +84,8 @@ contract BasicToken is ERC20Basic {
     mapping (address => uint256) balances;
     uint256 public endTimeLockedTokensTeam = 1598831999; // +2 years (Sun, 30 Aug 2020 23:59:59 GMT)
     uint256 public endTimeLockedTokensAdvisor = 1551398400; // + 6 months (Fri, 01 Mar 2019 00:00:00 GMT)
-    uint256 public walletTeam = 0xBF4eE9F5eC7dcEAb5E98D43F935244B093cB3861;
-    uint256 public walletAdvisor = 0x0171FD50c9a9387Ff738b848672c226b8929e8b1;
+    address public walletTeam = 0xBF4eE9F5eC7dcEAb5E98D43F935244B093cB3861;
+    address public walletAdvisor = 0x0171FD50c9a9387Ff738b848672c226b8929e8b1;
 
     /**
     * Protection against short address attack
@@ -216,6 +216,7 @@ contract StandardToken is ERC20, BasicToken {
  */
 contract Ownable {
     address public owner;
+    address public ownerTwo;
 
     event OwnerChanged(address indexed previousOwner, address indexed newOwner);
 
@@ -231,7 +232,7 @@ contract Ownable {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == owner || msg.sender == ownerTwo);
         _;
     }
 
@@ -299,7 +300,7 @@ contract MintableToken is StandardToken, Ownable {
      * Peterson's Law Protection
      * Claim tokens
      */
-    function claimTokens(address _token) public onlyOwner {
+    function claimTokens(address _token) public  onlyOwner {
         if (_token == 0x0) {
             owner.transfer(this.balance);
             return;
@@ -354,15 +355,15 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     *
     */
     uint256[] public rates  = [575, 550, 525, 500];
-    uint256[] public weiMinSale =  1 * 10**17;
+    uint256 public weiMinSale =  1 * 10**17;
 
     mapping (address => uint256) public deposited;
     mapping(address => bool) public whitelist;
 
     uint256 public constant INITIAL_SUPPLY = 50 * (10 ** 6) * (10 ** uint256(decimals));
     uint256 public fundForSale = 30 * (10 ** 6) * (10 ** uint256(decimals));
-    uint256 public fundTeam =  7500 * (10 ** 3) * (10 ** uint256(decimals));
-    uint256 public fundAdvisor = 5 * (10 ** 6) * (10 ** uint256(decimals));
+    uint256 public fundTeam =    7500 * (10 ** 3) * (10 ** uint256(decimals));
+    uint256 public fundAdvisor = 4500 * (10 ** 3) * (10 ** uint256(decimals));
 
     uint256 public countInvestor;
 
@@ -374,20 +375,22 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
 
     function GNCCrowdsale(
     address _owner,
-    address _wallet
+    address _wallet,
+    address _ownerTwo
     )
     public
     Crowdsale(_wallet)
     {
-
         require(_wallet != address(0));
         require(_owner != address(0));
+        require(_ownerTwo != address(0));
         owner = _owner;
+        ownerTwo = _ownerTwo;
         transfersEnabled = true;
         mintingFinished = false;
         state = State.Active;
         totalSupply = INITIAL_SUPPLY;
-        bool resultMintForOwner = mintForOwner(owner);
+        bool resultMintForOwner = mintForFund(owner);
         require(resultMintForOwner);
     }
 
@@ -422,13 +425,10 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
 
     function getTotalAmountOfTokens(uint256 _weiAmount) internal view returns (uint256) {
         uint256 currentDate = now;
-        //currentDate = 1520640000; //for test's
+        //currentDate = 1526342400; //for test's (Tue, 15 May 2018 00:00:00 GMT)
         uint256 currentPeriod = getPeriod(currentDate);
         uint256 amountOfTokens = 0;
         if(currentPeriod < 4){
-            if(_weiAmount < weiMinSale){
-                return 0;
-            }
             amountOfTokens = _weiAmount.mul(rates[currentPeriod]);
             if(whitelist[msg.sender]){
                 amountOfTokens = amountOfTokens.div(100).mul(110);
@@ -463,10 +463,12 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
         deposited[investor] = deposited[investor].add(msg.value);
     }
 
-    function mintForOwner(address _wallet) internal returns (bool result) {
+    function mintForFund(address _wallet) internal returns (bool result) {
         result = false;
         require(_wallet != address(0));
-        balances[_wallet] = balances[_wallet].add(INITIAL_SUPPLY);
+        balances[_wallet] = balances[_wallet].add(INITIAL_SUPPLY.sub(fundTeam).sub(fundAdvisor));
+        balances[walletTeam] = balances[walletTeam].add(fundTeam);
+        balances[walletAdvisor] = balances[walletAdvisor].add(fundAdvisor);
         result = true;
     }
 
@@ -476,6 +478,9 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
 
     function validPurchaseTokens(uint256 _weiAmount) public inState(State.Active) returns (uint256) {
         uint256 addTokens = getTotalAmountOfTokens(_weiAmount);
+        if(_weiAmount < weiMinSale){
+            return 0;
+        }
         if (tokenAllocated.add(addTokens) > fundForSale) {
             TokenLimitReached(tokenAllocated, addTokens);
             return 0;
@@ -496,10 +501,6 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
         result = true;
     }
 
-    function removeContract() public onlyOwner {
-        selfdestruct(owner);
-    }
-
     /**
      * @dev Function to burn tokens.
      * @return True if the operation was successful.
@@ -507,7 +508,6 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     function ownerBurnToken(uint _value) public onlyOwner returns (bool) {
         require(_value > 0);
         require(_value <= balances[owner]);
-        require(_value < totalSupply.sub(fundForTeam.add(tokenAllocated)));
 
         balances[owner] = balances[owner].sub(_value);
         totalSupply = totalSupply.sub(_value);

@@ -4,12 +4,12 @@ var GNCCrowdsale = artifacts.require("./GNCCrowdsale.sol");
 contract('GNCCrowdsale', (accounts) => {
     var contract;
     var owner = "0xc2d3B03082E39A91457459aE5fDcFb35F4278e20";
-    var rate = Number(300/10**8);
+    var rate = Number(575);
     var buyWei = 1 * 10**18;
-    var rateNew = Number(300/10**8);
+    var rateNew = Number(575);
     var buyWeiNew = 5 * 10**17;
-    var buyWeiMin = 1 * 10**15;
-    var totalSupply = 2e+19;
+    var buyWeiMin = 1 * 10**16;
+    var totalSupply = 38e+24;
 
     it('should deployed contract', async ()  => {
         assert.equal(undefined, contract);
@@ -77,27 +77,27 @@ contract('GNCCrowdsale', (accounts) => {
         period = await contract.getPeriod(currentDate);
         assert.equal(10, period);
 
-        currentDate = 1520640000; // Mar, 10
+        currentDate = 1526342400; // May, 15
         period = await contract.getPeriod(currentDate);
         assert.equal(0, period);
 
-        currentDate = 1523318400; // Apr, 10
+        currentDate = 1530748800; // Jul, 05
         period = await contract.getPeriod(currentDate);
         assert.equal(1, period);
 
-        currentDate = 1524873600; // Apr, 28
+        currentDate = 1532044800; // Jul, 20
         period = await contract.getPeriod(currentDate);
         assert.equal(2, period);
 
-        currentDate = 1532736000; // Jul, 28
+        currentDate = 1533859200; // Aug, 10
         period = await contract.getPeriod(currentDate);
         assert.equal(3, period);
 
-        currentDate = 1535414400; // Aug, 28
+        currentDate = 1536537600; // Sep, 10
         period = await contract.getPeriod(currentDate);
         assert.equal(10, period);
     });
-/*
+
     it('verification claim tokens', async ()  => {
         var balanceAccountOneBefore = await contract.balanceOf(accounts[0]);
         assert.equal(0, balanceAccountOneBefore);
@@ -116,7 +116,7 @@ contract('GNCCrowdsale', (accounts) => {
         var balanceOwnerAfter = await contract.balanceOf(owner);
         assert.equal(true, balanceOwnerBefore<balanceOwnerAfter);
     });
-*/
+
     it('verification tokens limit min amount', async ()  => {
             var numberTokensMinWey = await contract.validPurchaseTokens.call(buyWeiMin);
             //console.log("numberTokensMinWey = " + numberTokensMinWey);
