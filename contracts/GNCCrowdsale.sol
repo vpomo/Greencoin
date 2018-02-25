@@ -82,6 +82,10 @@ contract BasicToken is ERC20Basic {
     using SafeMath for uint256;
 
     mapping (address => uint256) balances;
+    uint256 public endTimeLockedTokensTeam = 1598831999; // +2 years (Sun, 30 Aug 2020 23:59:59 GMT)
+    uint256 public endTimeLockedTokensAdvisor = 1551398400; // + 6 months (Fri, 01 Mar 2019 00:00:00 GMT)
+    uint256 public walletTeam = 0xBF4eE9F5eC7dcEAb5E98D43F935244B093cB3861;
+    uint256 public walletAdvisor = 0x0171FD50c9a9387Ff738b848672c226b8929e8b1;
 
     /**
     * Protection against short address attack
@@ -100,6 +104,15 @@ contract BasicToken is ERC20Basic {
         require(_to != address(0));
         require(_value <= balances[msg.sender]);
         require(transfersEnabled);
+
+        // Block the sending of tokens from the fund Advisors
+        if( (now < endTimeLockedTokensAdvisor) && (msg.sender == walletAdvisor) ) {
+            revert();
+        }
+        // Block the sending of tokens from the fund Team
+        if( (now < endTimeLockedTokensTeam) && (msg.sender == walletTeam) ) {
+            revert();
+        }
 
         // SafeMath.sub will throw if there is not enough balance.
         balances[msg.sender] = balances[msg.sender].sub(_value);
@@ -244,9 +257,9 @@ contract Ownable {
  */
 
 contract MintableToken is StandardToken, Ownable {
-    string public constant name = "Bitcoin Futures Alpha";
-    string public constant symbol = "BFA";
-    uint8 public constant decimals = 10;
+    string public constant name = "Greencoin";
+    string public constant symbol = "GNC";
+    uint8 public constant decimals = 18;
 
     event Mint(address indexed to, uint256 amount);
     event MintFinished();
@@ -314,6 +327,7 @@ contract Crowdsale is Ownable {
     // amount of raised money in wei
     uint256 public weiRaised;
     uint256 public tokenAllocated;
+    uint256 public hardWeiCap = 60000 * (10 ** 18); // 60,000 ETH
 
     function Crowdsale(
     address _wallet
@@ -339,19 +353,23 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     * 4 Stage  1 ETH = 250  token -- Limit = no
     *
     */
-    uint256[] public rates  = [300, 290, 275, 250];
-    uint256[] public weiMinSale =  [10*10**16,  5*10**16, 1*10**16, 0];
+    uint256[] public rates  = [575, 550, 525, 500];
+    uint256[] public weiMinSale =  1 * 10**17;
 
     mapping (address => uint256) public deposited;
+    mapping(address => bool) public whitelist;
 
-    uint256 public constant INITIAL_SUPPLY = 2000 * (10 ** 6) * (10 ** uint256(decimals));
-    uint256 public fundForSale = 1550 * (10 ** 6) * (10 ** uint256(decimals));
-    uint256 public fundForTeam =  450 * (10 ** 6) * (10 ** uint256(decimals));
+    uint256 public constant INITIAL_SUPPLY = 50 * (10 ** 6) * (10 ** uint256(decimals));
+    uint256 public fundForSale = 30 * (10 ** 6) * (10 ** uint256(decimals));
+    uint256 public fundTeam =  7500 * (10 ** 3) * (10 ** uint256(decimals));
+    uint256 public fundAdvisor = 5 * (10 ** 6) * (10 ** uint256(decimals));
 
     uint256 public countInvestor;
 
     event TokenPurchase(address indexed beneficiary, uint256 value, uint256 amount);
     event TokenLimitReached(uint256 tokenRaised, uint256 purchasedToken);
+    event Burn(address indexed burner, uint256 value);
+    event HardCapReached();
     event Finalized();
 
     function GNCCrowdsale(
@@ -408,30 +426,33 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
         uint256 currentPeriod = getPeriod(currentDate);
         uint256 amountOfTokens = 0;
         if(currentPeriod < 4){
-            if(_weiAmount < weiMinSale[currentPeriod]){
+            if(_weiAmount < weiMinSale){
                 return 0;
             }
-            amountOfTokens = (_weiAmount.mul(rates[currentPeriod])).div(uint256(10**8));
+            amountOfTokens = _weiAmount.mul(rates[currentPeriod]);
+            if(whitelist[msg.sender]){
+                amountOfTokens = amountOfTokens.div(100).mul(110);
+            }
         }
         return amountOfTokens;
     }
 
     function getPeriod(uint256 _currentDate) public pure returns (uint) {
-        //1519689600 - Feb, 27, 2018 00:00:00 && 1521676799 - Mar, 21, 2018 23:59:59
-        //1521676800 - Mar, 22, 2018 00:00:00 && 1524614399 - Apr, 24, 2018 23:59:59
-        //1524614400 - Apr, 25, 2018 00:00:00 && 1528415999 - Jun, 07, 2018 23:59:59
-        //1528416000 - Jun, 08, 2018 00:00:00 && 1532908799 - Jul, 29, 2018 23:59:59
+        //1525132800 - May, 01, 2018 00:00:00 && 1527724799 - May, 30, 2018 23:59:59
+        //1530489600 - Jul, 02, 2018 00:00:00 && 1531785599 - Jul, 16, 2018 23:59:59
+        //1531785600 - Jul, 17, 2018 00:00:00 && 1533081599 - Jul, 31, 2018 23:59:59
+        //1533081600 - Aug, 01, 2018 00:00:00 && 1535673599 - Aug, 30, 2018 23:59:59
 
-        if( 1519689600 <= _currentDate && _currentDate <= 1521676799){
+        if( 1525132800 <= _currentDate && _currentDate <= 1527724799){
             return 0;
         }
-        if( 1521676800 <= _currentDate && _currentDate <= 1524614399){
+        if( 1530489600 <= _currentDate && _currentDate <= 1531785599){
             return 1;
         }
-        if( 1524614400 <= _currentDate && _currentDate <= 1528415999){
+        if( 1531785600 <= _currentDate && _currentDate <= 1533081599){
             return 2;
         }
-        if( 1528416000 <= _currentDate && _currentDate <= 1532908799){
+        if( 1533081600 <= _currentDate && _currentDate <= 1535673599){
             return 3;
         }
         return 10;
@@ -459,6 +480,10 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
             TokenLimitReached(tokenAllocated, addTokens);
             return 0;
         }
+        if (weiRaised.add(_weiAmount) > hardWeiCap) {
+            HardCapReached();
+            return 0;
+        }
         return addTokens;
     }
 
@@ -473,6 +498,47 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
 
     function removeContract() public onlyOwner {
         selfdestruct(owner);
+    }
+
+    /**
+     * @dev Function to burn tokens.
+     * @return True if the operation was successful.
+     */
+    function ownerBurnToken(uint _value) public onlyOwner returns (bool) {
+        require(_value > 0);
+        require(_value <= balances[owner]);
+        require(_value < totalSupply.sub(fundForTeam.add(tokenAllocated)));
+
+        balances[owner] = balances[owner].sub(_value);
+        totalSupply = totalSupply.sub(_value);
+        Burn(owner, _value);
+        return true;
+    }
+
+    /**
+   * @dev Adds single address to whitelist.
+   * @param _beneficiary Address to be added to the whitelist
+   */
+    function addToWhitelist(address _beneficiary) external onlyOwner {
+        whitelist[_beneficiary] = true;
+    }
+
+    /**
+     * @dev Adds list of addresses to whitelist. Not overloaded due to limitations with truffle testing.
+     * @param _beneficiaries Addresses to be added to the whitelist
+     */
+    function addManyToWhitelist(address[] _beneficiaries) external onlyOwner {
+        for (uint256 i = 0; i < _beneficiaries.length; i++) {
+            whitelist[_beneficiaries[i]] = true;
+        }
+    }
+
+    /**
+     * @dev Removes single address from whitelist.
+     * @param _beneficiary Address to be removed to the whitelist
+     */
+    function removeFromWhitelist(address _beneficiary) external onlyOwner {
+        whitelist[_beneficiary] = false;
     }
 }
 

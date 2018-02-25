@@ -3,7 +3,7 @@ var GNCCrowdsale = artifacts.require("./GNCCrowdsale.sol");
 
 contract('GNCCrowdsale', (accounts) => {
     var contract;
-    var owner = "0xb79151e54dE4fc0a5940A52A70f5607055AdB73E";
+    var owner = "0xc2d3B03082E39A91457459aE5fDcFb35F4278e20";
     var rate = Number(300/10**8);
     var buyWei = 1 * 10**18;
     var rateNew = Number(300/10**8);
