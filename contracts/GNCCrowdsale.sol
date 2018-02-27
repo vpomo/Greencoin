@@ -47,8 +47,6 @@ library SafeMath {
 contract ERC20Basic {
     uint256 public totalSupply;
 
-    bool public transfersEnabled;
-
     function balanceOf(address who) public view returns (uint256);
 
     function transfer(address to, uint256 value) public returns (bool);
@@ -59,8 +57,6 @@ contract ERC20Basic {
 
 contract ERC20 {
     uint256 public totalSupply;
-
-    bool public transfersEnabled;
 
     function balanceOf(address _owner) public constant returns (uint256 balance);
 
@@ -84,8 +80,8 @@ contract BasicToken is ERC20Basic {
     mapping (address => uint256) balances;
     uint256 public endTimeLockedTokensTeam = 1598831999; // +2 years (Sun, 30 Aug 2020 23:59:59 GMT)
     uint256 public endTimeLockedTokensAdvisor = 1551398400; // + 6 months (Fri, 01 Mar 2019 00:00:00 GMT)
-    address public walletTeam = 0xBF4eE9F5eC7dcEAb5E98D43F935244B093cB3861;
-    address public walletAdvisor = 0x0171FD50c9a9387Ff738b848672c226b8929e8b1;
+    address public walletTeam = 0xdEffB0629FD35AD1A462C13D65f003E9079C3bb1;
+    address public walletAdvisor = 0xD437f2289B4d20988EcEAc5E050C6b4860FFF4Ac;
 
     /**
     * Protection against short address attack
@@ -103,7 +99,6 @@ contract BasicToken is ERC20Basic {
     function transfer(address _to, uint256 _value) public onlyPayloadSize(2) returns (bool) {
         require(_to != address(0));
         require(_value <= balances[msg.sender]);
-        require(transfersEnabled);
 
         // Block the sending of tokens from the fund Advisors
         if( (now < endTimeLockedTokensAdvisor) && (msg.sender == walletAdvisor) ) {
@@ -147,7 +142,6 @@ contract StandardToken is ERC20, BasicToken {
         require(_to != address(0));
         require(_value <= balances[_from]);
         require(_value <= allowed[_from][msg.sender]);
-        require(transfersEnabled);
 
         balances[_from] = balances[_from].sub(_value);
         balances[_to] = balances[_to].add(_value);
@@ -208,7 +202,6 @@ contract StandardToken is ERC20, BasicToken {
 
 }
 
-
 /**
  * @title Ownable
  * @dev The Ownable contract has an owner address, and provides basic authorization control
@@ -217,16 +210,24 @@ contract StandardToken is ERC20, BasicToken {
 contract Ownable {
     address public owner;
     address public ownerTwo;
-
-    event OwnerChanged(address indexed previousOwner, address indexed newOwner);
+    struct PermissionFunction {
+                bool approveOwner;
+                bool approveOwnerTwo;
+    }
+    PermissionFunction[] public permissions;
 
     /**
      * @dev The Ownable constructor sets the original `owner` of the contract to the sender
      * account.
      */
     function Ownable() public {
+        permissions.push(PermissionFunction(false, false));
+/*
+        for (uint8 i = 0; i < 5; i++) {
+            permissions.push(PermissionFunction(false, false));
+        }
+*/
     }
-
 
     /**
      * @dev Throws if called by any account other than the owner.
@@ -237,16 +238,28 @@ contract Ownable {
     }
 
 
-    /**
-     * @dev Allows the current owner to transfer control of the contract to a newOwner.
-     * @param newOwner The address to transfer ownership to.
-     */
-    function changeOwner(address newOwner) onlyOwner internal {
-        require(newOwner != address(0));
-        OwnerChanged(owner, newOwner);
-        owner = newOwner;
+    function setApproveOwner(uint8 _numberFunction, bool _permValue) onlyOwner public {
+        if(msg.sender == owner){
+            permissions[_numberFunction].approveOwner = _permValue;
+        }
+        if(msg.sender == ownerTwo){
+            permissions[_numberFunction].approveOwnerTwo = _permValue;
+        }
     }
-
+/*
+    function getApprove(uint8 _numberFunction) public view onlyOwner returns (bool) {
+        if(msg.sender == owner){
+            return permissions[_numberFunction].approveOwner;
+        }
+        if(msg.sender == ownerTwo){
+            return permissions[_numberFunction].approveOwnerTwo;
+        }
+    }
+*/
+    function removePermission(uint8 _numberFunction) public onlyOwner {
+        permissions[_numberFunction].approveOwner = false;
+        permissions[_numberFunction].approveOwnerTwo = false;
+    }
 }
 
 
@@ -263,14 +276,6 @@ contract MintableToken is StandardToken, Ownable {
     uint8 public constant decimals = 18;
 
     event Mint(address indexed to, uint256 amount);
-    event MintFinished();
-
-    bool public mintingFinished;
-
-    modifier canMint() {
-        require(!mintingFinished);
-        _;
-    }
 
     /**
      * @dev Function to mint tokens
@@ -278,7 +283,7 @@ contract MintableToken is StandardToken, Ownable {
      * @param _amount The amount of tokens to mint.
      * @return A boolean that indicates if the operation was successful.
      */
-    function mint(address _to, uint256 _amount, address _owner) canMint internal returns (bool) {
+    function mint(address _to, uint256 _amount, address _owner) internal returns (bool) {
         balances[_to] = balances[_to].add(_amount);
         balances[_owner] = balances[_owner].sub(_amount);
         Mint(_to, _amount);
@@ -287,28 +292,20 @@ contract MintableToken is StandardToken, Ownable {
     }
 
     /**
-     * @dev Function to stop minting new tokens.
-     * @return True if the operation was successful.
-     */
-    function finishMinting() onlyOwner canMint internal returns (bool) {
-        mintingFinished = true;
-        MintFinished();
-        return true;
-    }
-
-    /**
      * Peterson's Law Protection
      * Claim tokens
      */
     function claimTokens(address _token) public  onlyOwner {
+        //require(permissions[4].approveOwner == true && permissions[4].approveOwnerTwo == true);
         if (_token == 0x0) {
-            owner.transfer(this.balance);
-            return;
-        }
+                owner.transfer(this.balance);
+                return;
+            }
         MintableToken token = MintableToken(_token);
         uint256 balance = token.balanceOf(this);
         token.transfer(owner, balance);
         Transfer(_token, owner, balance);
+        //removePermission(4);
     }
 }
 
@@ -344,9 +341,6 @@ contract Crowdsale is Ownable {
 contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     using SafeMath for uint256;
 
-    enum State {Active, Closed}
-    State public state;
-
     /**
     * 1 Stage  1 ETH = 300  token -- Limit = 0,10  ETH
     * 2 Stage  1 ETH = 290  token -- Limit = 0,05  ETH
@@ -364,6 +358,8 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     uint256 public fundForSale = 30 * (10 ** 6) * (10 ** uint256(decimals));
     uint256 public fundTeam =    7500 * (10 ** 3) * (10 ** uint256(decimals));
     uint256 public fundAdvisor = 4500 * (10 ** 3) * (10 ** uint256(decimals));
+    uint256 public fundBounty =    500 * (10 ** 3) * (10 ** uint256(decimals));
+    address public bounty;
 
     uint256 public countInvestor;
 
@@ -376,7 +372,8 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     function GNCCrowdsale(
     address _owner,
     address _wallet,
-    address _ownerTwo
+    address _ownerTwo,
+    address _bounty
     )
     public
     Crowdsale(_wallet)
@@ -384,19 +381,13 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
         require(_wallet != address(0));
         require(_owner != address(0));
         require(_ownerTwo != address(0));
+        require(_bounty != address(0));
         owner = _owner;
         ownerTwo = _ownerTwo;
-        transfersEnabled = true;
-        mintingFinished = false;
-        state = State.Active;
+        bounty = _bounty;
         totalSupply = INITIAL_SUPPLY;
         bool resultMintForOwner = mintForFund(owner);
         require(resultMintForOwner);
-    }
-
-    modifier inState(State _state) {
-        require(state == _state);
-        _;
     }
 
     // fallback function can be used to buy tokens
@@ -405,7 +396,7 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     }
 
     // low level token purchase function
-    function buyTokens(address _investor) public inState(State.Active) payable returns (uint256){
+    function buyTokens(address _investor) public payable returns (uint256){
         require(_investor != address(0));
         uint256 weiAmount = msg.value;
         uint256 tokens = validPurchaseTokens(weiAmount);
@@ -459,16 +450,16 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     }
 
     function deposit(address investor) internal {
-        require(state == State.Active);
         deposited[investor] = deposited[investor].add(msg.value);
     }
 
     function mintForFund(address _wallet) internal returns (bool result) {
         result = false;
         require(_wallet != address(0));
-        balances[_wallet] = balances[_wallet].add(INITIAL_SUPPLY.sub(fundTeam).sub(fundAdvisor));
+        balances[_wallet] = balances[_wallet].add(INITIAL_SUPPLY.sub(fundTeam).sub(fundAdvisor).sub(fundBounty));
         balances[walletTeam] = balances[walletTeam].add(fundTeam);
         balances[walletAdvisor] = balances[walletAdvisor].add(fundAdvisor);
+        balances[bounty] = balances[bounty].add(fundBounty);
         result = true;
     }
 
@@ -476,7 +467,7 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
         return deposited[_investor];
     }
 
-    function validPurchaseTokens(uint256 _weiAmount) public inState(State.Active) returns (uint256) {
+    function validPurchaseTokens(uint256 _weiAmount) public returns (uint256) {
         uint256 addTokens = getTotalAmountOfTokens(_weiAmount);
         if(_weiAmount < weiMinSale){
             return 0;
@@ -492,15 +483,6 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
         return addTokens;
     }
 
-    function finalize() public onlyOwner inState(State.Active) returns (bool result) {
-        result = false;
-        state = State.Closed;
-        wallet.transfer(this.balance);
-        finishMinting();
-        Finalized();
-        result = true;
-    }
-
     /**
      * @dev Function to burn tokens.
      * @return True if the operation was successful.
@@ -508,10 +490,12 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
     function ownerBurnToken(uint _value) public onlyOwner returns (bool) {
         require(_value > 0);
         require(_value <= balances[owner]);
+        require(permissions[0].approveOwner == true && permissions[0].approveOwnerTwo == true);
 
         balances[owner] = balances[owner].sub(_value);
         totalSupply = totalSupply.sub(_value);
         Burn(owner, _value);
+        removePermission(0);
         return true;
     }
 
@@ -520,6 +504,7 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
    * @param _beneficiary Address to be added to the whitelist
    */
     function addToWhitelist(address _beneficiary) external onlyOwner {
+        //require(permissions[1].approveOwner == true && permissions[1].approveOwnerTwo == true);
         whitelist[_beneficiary] = true;
     }
 
@@ -528,6 +513,7 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
      * @param _beneficiaries Addresses to be added to the whitelist
      */
     function addManyToWhitelist(address[] _beneficiaries) external onlyOwner {
+        //require(permissions[2].approveOwner == true && permissions[2].approveOwnerTwo == true);
         for (uint256 i = 0; i < _beneficiaries.length; i++) {
             whitelist[_beneficiaries[i]] = true;
         }
@@ -538,6 +524,7 @@ contract GNCCrowdsale is Ownable, Crowdsale, MintableToken {
      * @param _beneficiary Address to be removed to the whitelist
      */
     function removeFromWhitelist(address _beneficiary) external onlyOwner {
+        //require(permissions[3].approveOwner == true && permissions[3].approveOwnerTwo == true);
         whitelist[_beneficiary] = false;
     }
 }

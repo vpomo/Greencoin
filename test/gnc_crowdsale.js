@@ -3,13 +3,13 @@ var GNCCrowdsale = artifacts.require("./GNCCrowdsale.sol");
 
 contract('GNCCrowdsale', (accounts) => {
     var contract;
-    var owner = "0xc2d3B03082E39A91457459aE5fDcFb35F4278e20";
+    var owner = "0x8Ac4ebcCff568797Ea4Dbb5F39b0ac534ccB901a";
     var rate = Number(575);
     var buyWei = 1 * 10**18;
     var rateNew = Number(575);
     var buyWeiNew = 5 * 10**17;
     var buyWeiMin = 1 * 10**16;
-    var totalSupply = 38e+24;
+    var totalSupply = 3.75e+25;
 
     it('should deployed contract', async ()  => {
         assert.equal(undefined, contract);
