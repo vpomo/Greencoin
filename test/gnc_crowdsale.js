@@ -77,23 +77,23 @@ contract('GNCCrowdsale', (accounts) => {
         period = await contract.getPeriod(currentDate);
         assert.equal(10, period);
 
-        currentDate = 1526342400; // May, 15
+        currentDate = 1529020800; // Jun, 15
         period = await contract.getPeriod(currentDate);
         assert.equal(0, period);
 
-        currentDate = 1530748800; // Jul, 05
+        currentDate = 1533427200; // Aug, 05
         period = await contract.getPeriod(currentDate);
         assert.equal(1, period);
 
-        currentDate = 1532044800; // Jul, 20
+        currentDate = 1534723200; // Aug, 20
         period = await contract.getPeriod(currentDate);
         assert.equal(2, period);
 
-        currentDate = 1533859200; // Aug, 10
+        currentDate = 1537401600; // Sep, 20
         period = await contract.getPeriod(currentDate);
         assert.equal(3, period);
 
-        currentDate = 1536537600; // Sep, 10
+        currentDate = 1539993600; // Oct, 20
         period = await contract.getPeriod(currentDate);
         assert.equal(10, period);
     });
